@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String         @id @default(cuid())
+  email           String         @unique
+  displayName     String
+  role            String
+  password        UserPassword?
+  areas           Area[]
+  projects        Project[]
+  ownedTasks      Task[]         @relation("TaskOwner")
+  assignedTasks   Task[]         @relation("TaskAssignee")
+  resources       Resource[]
+  archiveEntries  ArchiveEntry[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model UserPassword {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Area {
+  id          String     @id @default(cuid())
+  ownerId     String
+  owner       User       @relation(fields: [ownerId], references: [id])
+  name        String
+  description String
+  colorHex    String
+  iconName    String
+  projects    Project[]
+  tasks       Task[]
+  resources   Resource[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Project {
+  id                 String     @id @default(cuid())
+  areaId             String
+  area               Area       @relation(fields: [areaId], references: [id])
+  ownerId            String
+  owner              User       @relation(fields: [ownerId], references: [id])
+  title              String
+  description        String
+  status             String
+  priority           String
+  dueDate            DateTime?
+  progressPercentage Int        @default(0)
+  tasks              Task[]
+  resources          Resource[]
+  archivedAt         DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  ownerId     String
+  owner       User      @relation("TaskOwner", fields: [ownerId], references: [id])
+  areaId      String?
+  area        Area?     @relation(fields: [areaId], references: [id])
+  projectId   String?
+  project     Project?  @relation(fields: [projectId], references: [id])
+  title       String
+  description String
+  status      String
+  priority    String
+  assigneeId  String?
+  assignee    User?     @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  startDate   DateTime?
+  dueDate     DateTime?
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Resource {
+  id          String    @id @default(cuid())
+  ownerId     String
+  owner       User      @relation(fields: [ownerId], references: [id])
+  title       String
+  description String
+  type        String
+  url         String?
+  notes       String
+  tags        String
+  areaId      String?
+  area        Area?     @relation(fields: [areaId], references: [id])
+  projectId   String?
+  project     Project?  @relation(fields: [projectId], references: [id])
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model ArchiveEntry {
+  id          String   @id @default(cuid())
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id])
+  entityType  String
+  entityId    String
+  snapshot    String
+  reason      String
+  archivedAt  DateTime @default(now())
+  restoredAt  DateTime?
+}

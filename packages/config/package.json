@@ -1,0 +1,15 @@
+{
+  "name": "@cyber/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tsconfig.base": "./tsconfig.base.json",
+    "./eslint": "./eslint.config.js"
+  },
+  "dependencies": {
+    "@eslint/js": "^8.57.0",
+    "eslint": "^8.57.0",
+    "typescript-eslint": "^7.18.0"
+  }
+}
