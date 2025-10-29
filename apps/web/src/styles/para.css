@@ -26,7 +26,8 @@ body,
 
 body {
   margin: 0;
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
   background: var(--lab-bg-dark);
   color: var(--lab-text-light);
   -webkit-font-smoothing: antialiased;
@@ -37,7 +38,7 @@ a {
   text-decoration: none;
 }
 
-a:hover {
+.para-section__link:hover .para-section__link-text {
   text-decoration: underline;
 }
 
@@ -307,6 +308,13 @@ button {
   color: var(--lab-border-glow);
 }
 
+button.para-section__link {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
 .para-card-grid {
   display: grid;
   gap: 12px;
@@ -359,6 +367,49 @@ button {
 .para-card--area {
   min-height: 128px;
   justify-content: space-between;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -800px 0;
+  }
+  100% {
+    background-position: 800px 0;
+  }
+}
+
+.para-card.is-loading .para-area-icon,
+.para-card.is-loading .para-card__title,
+.para-card.is-loading .para-card__meta {
+  color: transparent;
+  background: #3a4145;
+  background-image: linear-gradient(
+    to right,
+    #3a4145 0%,
+    #4d565a 20%,
+    #3a4145 40%,
+    #3a4145 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 1000px 100%;
+  animation: shimmer 2s linear infinite;
+  border-radius: 4px;
+}
+
+.para-card.is-loading .para-area-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+
+.para-card.is-loading .para-card__title {
+  height: 16px;
+  width: 75%;
+}
+
+.para-card.is-loading .para-card__meta {
+  height: 12px;
+  width: 50%;
 }
 
 .para-card--resource,

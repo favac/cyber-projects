@@ -1,11 +1,6 @@
-const API_BASE_URL = "http://localhost:3001";
+import type { Area, User } from "@cyber/domain";
 
-interface User {
-  id: string;
-  email: string;
-  displayName: string;
-  role: string;
-}
+const API_BASE_URL = "http://localhost:3001";
 
 interface AuthResponse {
   user: User;
@@ -85,4 +80,20 @@ export function logout(): void {
 
 export function isAuthenticated(): boolean {
   return !!localStorage.getItem("auth_token");
+}
+
+export async function getAreas(): Promise<Area[]> {
+  return fetchApi<Area[]>("/areas");
+}
+
+export async function createArea(data: {
+  name: string;
+  description: string;
+  colorHex: string;
+  iconName: string;
+}): Promise<Area> {
+  return fetchApi<Area>("/areas", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 }
