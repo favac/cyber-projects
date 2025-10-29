@@ -1,4 +1,4 @@
-import type { Area, User } from "@cyber/domain";
+import type { Area, User, Project } from "@cyber/domain";
 
 const API_BASE_URL = "http://localhost:3001";
 
@@ -86,6 +86,10 @@ export async function getAreas(): Promise<Area[]> {
   return fetchApi<Area[]>("/areas");
 }
 
+export async function getProjects(): Promise<Project[]> {
+  return fetchApi<Project[]>("/projects");
+}
+
 export async function createArea(data: {
   name: string;
   description: string;
@@ -93,6 +97,13 @@ export async function createArea(data: {
   iconName: string;
 }): Promise<Area> {
   return fetchApi<Area>("/areas", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function createProject(data: { title: string; description: string; status: string; areaId: string; }): Promise<Project> {
+  return fetchApi<Project>("/projects", {
     method: "POST",
     body: JSON.stringify(data),
   });

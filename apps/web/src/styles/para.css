@@ -328,6 +328,41 @@ button.para-section__link {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
+.para-empty-state {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  background: rgba(43, 51, 56, 0.8);
+  border: 1px solid var(--lab-border-glow);
+  grid-column: 1 / -1;
+}
+
+.para-empty-state__icon {
+  font-size: 36px;
+  color: var(--lab-status-in-progress);
+}
+
+.para-empty-state__text {
+  display: flex;
+  flex-direction: column;
+}
+
+.para-empty-state__title {
+  margin: 0 0 4px;
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--lab-text-light);
+}
+
+.para-empty-state__description {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  color: var(--lab-text-muted);
+}
+
 .para-card {
   position: relative;
   display: flex;
@@ -410,6 +445,11 @@ button.para-section__link {
 .para-card.is-loading .para-card__meta {
   height: 12px;
   width: 50%;
+}
+
+.para-card.is-loading .para-tag {
+  height: 24px;
+  width: 80px;
 }
 
 .para-card--resource,

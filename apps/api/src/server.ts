@@ -9,6 +9,7 @@ import { env } from "./config/env.ts";
 import prismaPlugin from "./plugins/prisma.ts";
 import authPlugin from "./plugins/auth.ts";
 import areaRoutes from "./routes/area.ts";
+import projectRoutes from "./routes/project.ts";
 import authRoutes from "./routes/auth.ts";
 import healthRoutes from "./routes/health.ts";
 
@@ -24,5 +25,6 @@ export async function createServer(): Promise<FastifyInstance> {
   await app.register(healthRoutes, { prefix: "/health" });
   await app.register(authRoutes, { prefix: "/auth" });
   await app.register(areaRoutes, { prefix: "/areas" });
+  await app.register(projectRoutes, { prefix: "/projects" });
   return app;
 }

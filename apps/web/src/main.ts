@@ -2,6 +2,7 @@ import "./styles/para.css";
 import { clear, h, mount } from "./lib/h.ts";
 import { createPersistentStore } from "./stores/persistent-store.ts";
 import { createAreaModal } from "./components/area-modal.ts";
+import { createProjectModal } from "./components/project-modal.ts";
 import { createLoginModal } from "./components/login-modal.ts";
 import { createRegisterModal } from "./components/register-modal.ts";
 import {
@@ -9,6 +10,7 @@ import {
   logout,
   getCurrentUser,
   getAreas,
+  getProjects,
 } from "./lib/api.ts";
 import type { Area } from "@cyber/domain";
 
@@ -27,6 +29,9 @@ interface AppState {
   readonly userName: string;
   readonly areas: readonly AreaCardData[];
   readonly isLoadingAreas: boolean;
+  readonly projects: readonly ProjectCardData[];
+  readonly isLoadingProjects: boolean;
+  readonly isProjectModalOpen: boolean;
 }
 
 interface ProjectCardData {
@@ -81,27 +86,6 @@ const navItems: readonly NavItem[] = [
     id: "settings",
     label: "Settings",
     icon: "settings",
-  },
-];
-
-const projectCards: readonly ProjectCardData[] = [
-  {
-    id: "website-redesign",
-    title: "Website Redesign",
-    dueLabel: "Due: 25 Dec",
-    status: "in-progress",
-  },
-  {
-    id: "marketing-plan",
-    title: "Q4 Marketing Plan",
-    dueLabel: "Due: 15 Nov",
-    status: "on-hold",
-  },
-  {
-    id: "feature-launch",
-    title: "New Feature Launch",
-    dueLabel: "Due: 01 Feb",
-    status: "completed",
   },
 ];
 
@@ -206,6 +190,9 @@ const store = createPersistentStore<AppState>("para-app", {
   userName: "",
   areas: [],
   isLoadingAreas: true,
+  projects: [],
+  isLoadingProjects: true,
+  isProjectModalOpen: false,
 });
 
 function materialIcon(name: string, className?: string): HTMLElement {
@@ -361,7 +348,45 @@ function createProjectCard(card: ProjectCardData): HTMLElement {
   );
 }
 
-function createProjectsSection(): HTMLElement {
+function createProjectCardSkeleton(): HTMLElement {
+  return h(
+    "article",
+    { class: "para-card para-card--project is-loading" },
+    h(
+      "div",
+      {},
+      h("h3", { class: "para-card__title" }),
+      h("p", { class: "para-card__meta" })
+    ),
+    h("span", { class: "para-tag" })
+  );
+}
+
+function createProjectsSection(
+  projects: readonly ProjectCardData[],
+  isLoading: boolean
+): HTMLElement {
+  const content = isLoading
+    ? Array.from({ length: 3 }, () => createProjectCardSkeleton())
+    : projects.length > 0
+    ? projects.map((card) => createProjectCard(card))
+    : [
+        h(
+          "div",
+          { class: "para-empty-state para-empty-state--projects" },
+          materialIcon("warning", "para-empty-state__icon"),
+          h(
+            "div",
+            { class: "para-empty-state__text" },
+            h("p", { class: "para-empty-state__title" }, "No hay proyectos"),
+            h(
+              "p",
+              { class: "para-empty-state__description" },
+              "Crea un nuevo proyecto para comenzar."
+            )
+          )
+        ),
+      ];
   return h(
     "section",
     { class: "para-section" },
@@ -369,13 +394,30 @@ function createProjectsSection(): HTMLElement {
       "div",
       { class: "para-section__header" },
       h("h2", { class: "para-section__title" }, "CURRENT PROJECTS"),
-      h("a", { class: "para-section__link", href: "#" }, "VIEW ALL")
+      h(
+        "div",
+        { style: { display: "flex", alignItems: "center", gap: "16px" } },
+        h(
+          "a",
+          {
+            class: "para-section__link",
+            href: "#",
+            onClick: (e) => {
+              e.preventDefault();
+              store.update({ ...store.get(), isProjectModalOpen: true });
+            },
+          },
+          materialIcon("add"),
+          h("span", { class: "para-section__link-text" }, "NEW PROJECT")
+        ),
+        h(
+          "a",
+          { class: "para-section__link", href: "#" },
+          h("span", { class: "para-section__link-text" }, "VIEW ALL")
+        )
+      )
     ),
-    h(
-      "div",
-      { class: "para-card-grid para-card-grid--projects" },
-      projectCards.map((card) => createProjectCard(card))
-    )
+    h("div", { class: "para-card-grid para-card-grid--projects" }, content)
   );
 }
 
@@ -550,7 +592,7 @@ function renderSections(state: AppState): HTMLElement {
   return h(
     "div",
     { class: "para-sections" },
-    createProjectsSection(),
+    createProjectsSection(state.projects, state.isLoadingProjects),
     createAreasSection(state.areas, state.isLoadingAreas),
     createResourcesSection(),
     createArchiveSection()
@@ -560,6 +602,35 @@ function renderSections(state: AppState): HTMLElement {
 function renderLayout(state: AppState): HTMLElement {
   const handleCloseModal = (): void => {
     store.update({ ...store.get(), isModalOpen: false });
+  };
+
+  const handleProjectCreated = async (): Promise<void> => {
+    try {
+      store.update({
+        ...store.get(),
+        isProjectModalOpen: false,
+        isLoadingProjects: true,
+      });
+
+      const projects = await getProjects();
+      const projectCards: ProjectCardData[] = projects.map((project) => ({
+        id: project.id,
+        title: project.title,
+        dueLabel: project.dueDate
+          ? `Due: ${new Date(project.dueDate).toLocaleDateString()}`
+          : "",
+        status: project.status as ProjectStatus,
+      }));
+
+      store.update({
+        ...store.get(),
+        projects: projectCards,
+        isLoadingProjects: false,
+      });
+    } catch (error) {
+      console.error("Failed to create project:", error);
+      store.update({ ...store.get(), isLoadingProjects: false });
+    }
   };
 
   const handleSubmitArea = async (): Promise<void> => {
@@ -588,27 +659,49 @@ function renderLayout(state: AppState): HTMLElement {
   const handleAuthSuccess = async (): Promise<void> => {
     try {
       const user = await getCurrentUser();
-      const areas = await getAreas();
-      const areaCards: AreaCardData[] = areas.map((area: Area) => ({
+      const [areas, projects] = await Promise.all([getAreas(), getProjects()]);
+
+      const areaCards: AreaCardData[] = areas.map((area) => ({
         id: area.id,
         label: area.name,
         summary: area.description,
         icon: area.iconName,
       }));
+
+      const projectCards: ProjectCardData[] = projects.map((project) => ({
+        id: project.id,
+        title: project.title,
+        dueLabel: project.dueDate
+          ? `Due: ${new Date(project.dueDate).toLocaleDateString()}`
+          : "",
+        status: project.status as ProjectStatus,
+      }));
+
       store.update({
         ...store.get(),
         isAuthenticated: true,
         userName: user.displayName,
         areas: areaCards,
+        projects: projectCards,
         isLoginModalOpen: false,
         isRegisterModalOpen: false,
         isLoadingAreas: false,
+        isLoadingProjects: false,
       });
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Failed to get user:", error);
     }
   };
+
+  const projectModal = createProjectModal({
+    isOpen: state.isProjectModalOpen,
+    onClose: () => store.update({ ...store.get(), isProjectModalOpen: false }),
+    onProjectCreated: () => {
+      void handleProjectCreated();
+    },
+    areas: state.areas.map((a) => ({ id: a.id, name: a.label })),
+  });
 
   const areaModal = createAreaModal({
     isOpen: state.isModalOpen,
@@ -658,6 +751,9 @@ function renderLayout(state: AppState): HTMLElement {
     );
     if (areaModal) {
       children.push(areaModal);
+    }
+    if (projectModal) {
+      children.push(projectModal);
     }
   } else {
     children.push(
@@ -783,20 +879,33 @@ async function initializeAuth(): Promise<void> {
   if (isAuthenticated()) {
     try {
       const user = await getCurrentUser();
-      const areas = await getAreas();
-      const areaCards: AreaCardData[] = areas.map((area: Area) => ({
+      const [areas, projects] = await Promise.all([getAreas(), getProjects()]);
+
+      const areaCards: AreaCardData[] = areas.map((area) => ({
         id: area.id,
         label: area.name,
         summary: area.description,
         icon: area.iconName,
       }));
+
+      const projectCards: ProjectCardData[] = projects.map((project) => ({
+        id: project.id,
+        title: project.title,
+        dueLabel: project.dueDate
+          ? `Due: ${new Date(project.dueDate).toLocaleDateString()}`
+          : "",
+        status: project.status as ProjectStatus,
+      }));
+
       store.update({
         ...store.get(),
         isAuthenticated: true,
         userName: user.displayName,
         areas: areaCards,
+        projects: projectCards,
         isLoginModalOpen: false,
         isLoadingAreas: false,
+        isLoadingProjects: false,
       });
     } catch (error) {
       console.error("Failed to initialize auth:", error);
@@ -806,16 +915,22 @@ async function initializeAuth(): Promise<void> {
         isAuthenticated: false,
         userName: "",
         areas: [],
+        projects: [],
         isLoginModalOpen: true,
         isLoadingAreas: false,
+        isLoadingProjects: false,
       });
     }
   } else {
-    store.update({ ...store.get(), isLoadingAreas: false });
+    store.update({
+      ...store.get(),
+      isLoadingAreas: false,
+      isLoadingProjects: false,
+    });
   }
 }
 
-function bootstrap(): void {
+async function bootstrap(): Promise<void> {
   const root = document.querySelector<HTMLDivElement>("#app");
   if (!root) {
     // eslint-disable-next-line no-console
@@ -823,11 +938,11 @@ function bootstrap(): void {
     return;
   }
   clear(root);
+  await initializeAuth();
   mount(root, renderLayout(store.get()));
   store.subscribe((state) => {
     mount(root, renderLayout(state));
   });
-  void initializeAuth();
 }
 
-bootstrap();
+void bootstrap();
