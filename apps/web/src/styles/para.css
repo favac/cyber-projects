@@ -386,6 +386,27 @@ button.para-section__link {
   gap: 16px;
 }
 
+.para-card--task {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.para-card__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.para-card__badges {
+  display: flex;
+  gap: 8px;
+}
+
+.para-card__meta--right {
+  text-align: right;
+}
+
 .para-card--project .para-card__title,
 .para-card--project .para-card__meta {
   font-size: 13px;
@@ -497,8 +518,25 @@ button.para-section__link {
   background: var(--lab-status-on-hold);
 }
 
-.para-tag--completed {
+.para-tag--completed,
+.para-tag--done {
   background: var(--lab-status-completed);
+}
+
+.para-tag--todo {
+  background: var(--lab-text-muted);
+}
+
+.para-tag--priority-low {
+  background-color: #3b82f6;
+}
+
+.para-tag--priority-medium {
+  background-color: #f97316;
+}
+
+.para-tag--priority-high {
+  background-color: #ef4444;
 }
 
 .para-area-icon {
@@ -877,4 +915,90 @@ button.para-section__link {
   .para-hero {
     padding: 24px;
   }
+}
+
+.para-toast-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 2000;
+}
+
+.para-toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: var(--lab-element-dark);
+  border: 1px solid var(--lab-border-glow);
+  color: var(--lab-text-light);
+  box-shadow: 0 0 2px 0 var(--lab-border-glow);
+  min-width: 320px;
+  animation: toast-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes toast-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.para-toast--error {
+  background-color: rgba(198, 40, 40, 0.9);
+  border-color: rgba(198, 40, 40, 0.95);
+  color: var(--lab-text-light);
+  box-shadow: 0 0 8px 0 rgba(198, 40, 40, 0.7);
+}
+
+.para-toast--error .para-toast__message {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.para-toast--error .para-toast__icon,
+.para-toast--error .para-toast__close {
+  color: var(--lab-text-light);
+}
+
+.para-toast--success {
+  border-color: var(--lab-border-glow);
+  box-shadow: 0 0 2px 0 var(--lab-border-glow);
+}
+
+.para-toast--success .para-toast__icon {
+  color: var(--lab-border-glow);
+}
+
+.para-toast__icon {
+  font-size: 24px;
+}
+
+.para-toast__message {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+}
+
+.para-toast__close {
+  background: none;
+  border: none;
+  color: var(--lab-text-muted);
+  cursor: pointer;
+  padding: 0;
+  font-size: 20px;
+}
+
+.para-toast__close:hover {
+  color: var(--lab-text-light);
 }

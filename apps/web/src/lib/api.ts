@@ -1,4 +1,4 @@
-import type { Area, User, Project } from "@cyber/domain";
+import type { Area, User, Project, Task } from "@cyber/domain";
 
 const API_BASE_URL = "http://localhost:3001";
 
@@ -104,6 +104,23 @@ export async function createArea(data: {
 
 export async function createProject(data: { title: string; description: string; status: string; areaId: string; }): Promise<Project> {
   return fetchApi<Project>("/projects", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getTasks(): Promise<Task[]> {
+  return fetchApi<Task[]>("/tasks");
+}
+
+export async function createTask(data: {
+  title: string;
+  description: string;
+  priority: string;
+  areaId?: string;
+  projectId?: string;
+}): Promise<Task> {
+  return fetchApi<Task>("/tasks", {
     method: "POST",
     body: JSON.stringify(data),
   });

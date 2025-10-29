@@ -20,7 +20,8 @@ function readFromStorage<TState>(key: string, fallback: TState): TState {
     return fallback;
   }
   try {
-    return JSON.parse(rawValue) as TState;
+    const storedState = JSON.parse(rawValue) as Partial<TState>;
+    return { ...fallback, ...storedState };
   } catch (error) {
     console.warn(`Failed to parse stored state for key "${key}"`, error);
     return fallback;

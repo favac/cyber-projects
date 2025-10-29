@@ -19,6 +19,7 @@ model User {
   assignedTasks   Task[]         @relation("TaskAssignee")
   resources       Resource[]
   archiveEntries  ArchiveEntry[]
+  comments        Comment[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 }
@@ -67,24 +68,29 @@ model Project {
 }
 
 model Task {
-  id          String    @id @default(cuid())
-  ownerId     String
-  owner       User      @relation("TaskOwner", fields: [ownerId], references: [id])
-  areaId      String?
-  area        Area?     @relation(fields: [areaId], references: [id])
-  projectId   String?
-  project     Project?  @relation(fields: [projectId], references: [id])
-  title       String
-  description String
-  status      String
-  priority    String
-  assigneeId  String?
-  assignee    User?     @relation("TaskAssignee", fields: [assigneeId], references: [id])
-  startDate   DateTime?
-  dueDate     DateTime?
-  archivedAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id           String    @id @default(cuid())
+  ownerId      String
+  owner        User      @relation("TaskOwner", fields: [ownerId], references: [id])
+  areaId       String?
+  area         Area?     @relation(fields: [areaId], references: [id])
+  projectId    String?
+  project      Project?  @relation(fields: [projectId], references: [id])
+  title        String
+  description  String
+  status       String
+  priority     String
+  assigneeId   String?
+  assignee     User?     @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  startDate    DateTime?
+  dueDate      DateTime?
+  archivedAt   DateTime?
+  parentTaskId String?
+  parentTask   Task?     @relation("SubTasks", fields: [parentTaskId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  subTasks     Task[]    @relation("SubTasks")
+  comments     Comment[]
+  tags         Tag[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 model Resource {
@@ -104,6 +110,23 @@ model Resource {
   archivedAt  DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+model Tag {
+  id    String @id @default(cuid())
+  name  String @unique
+  tasks Task[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id])
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ArchiveEntry {

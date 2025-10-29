@@ -3,14 +3,17 @@ import { clear, h, mount } from "./lib/h.ts";
 import { createPersistentStore } from "./stores/persistent-store.ts";
 import { createAreaModal } from "./components/area-modal.ts";
 import { createProjectModal } from "./components/project-modal.ts";
+import { createTaskModal } from "./components/task-modal.ts";
 import { createLoginModal } from "./components/login-modal.ts";
 import { createRegisterModal } from "./components/register-modal.ts";
+import { createToast, type Notification } from "./components/toast.ts";
 import {
   isAuthenticated,
   logout,
   getCurrentUser,
   getAreas,
   getProjects,
+  getTasks,
 } from "./lib/api.ts";
 import type { Area } from "@cyber/domain";
 
@@ -32,6 +35,10 @@ interface AppState {
   readonly projects: readonly ProjectCardData[];
   readonly isLoadingProjects: boolean;
   readonly isProjectModalOpen: boolean;
+  readonly isTaskModalOpen: boolean;
+  readonly tasks: readonly TaskCardData[];
+  readonly isLoadingTasks: boolean;
+  readonly notifications: readonly Notification[];
 }
 
 interface ProjectCardData {
@@ -64,6 +71,15 @@ interface ArchiveCardData {
   readonly meta: string;
   readonly image: string;
   readonly aspectRatio: string;
+}
+
+interface TaskCardData {
+  readonly id: string;
+  readonly title: string;
+  readonly status: string;
+  readonly priority: string;
+  readonly createdAt: string;
+  readonly dueDate?: string;
 }
 
 const navItems: readonly NavItem[] = [
@@ -193,6 +209,10 @@ const store = createPersistentStore<AppState>("para-app", {
   projects: [],
   isLoadingProjects: true,
   isProjectModalOpen: false,
+  isTaskModalOpen: false,
+  tasks: [],
+  isLoadingTasks: true,
+  notifications: [],
 });
 
 function materialIcon(name: string, className?: string): HTMLElement {
@@ -565,6 +585,110 @@ function createArchiveCard(card: ArchiveCardData): HTMLElement {
   );
 }
 
+function createTasksSection(
+  tasks: readonly TaskCardData[],
+  isLoading: boolean
+): HTMLElement {
+  const content = isLoading
+    ? Array.from({ length: 4 }, () => createTaskCardSkeleton())
+    : tasks.length > 0
+    ? tasks.map((card) => createTaskCard(card))
+    : [
+        h(
+          "div",
+          { class: "para-empty-state para-empty-state--tasks" },
+          materialIcon("check_circle", "para-empty-state__icon"),
+          h(
+            "div",
+            { class: "para-empty-state__text" },
+            h("p", { class: "para-empty-state__title" }, "No hay tareas"),
+            h(
+              "p",
+              { class: "para-empty-state__description" },
+              "Crea una nueva tarea para comenzar."
+            )
+          )
+        ),
+      ];
+  return h(
+    "section",
+    { class: "para-section" },
+    h(
+      "div",
+      { class: "para-section__header" },
+      h("h2", { class: "para-section__title" }, "MY TASKS"),
+      h(
+        "div",
+        { style: { display: "flex", alignItems: "center", gap: "16px" } },
+        h(
+          "a",
+          {
+            class: "para-section__link",
+            href: "#",
+            onClick: (e) => {
+              e.preventDefault();
+              store.update({ ...store.get(), isTaskModalOpen: true });
+            },
+          },
+          materialIcon("add"),
+          h("span", { class: "para-section__link-text" }, "NEW TASK")
+        ),
+        h(
+          "a",
+          { class: "para-section__link", href: "#" },
+          h("span", { class: "para-section__link-text" }, "VIEW ALL")
+        )
+      )
+    ),
+    h("div", { class: "para-card-grid para-card-grid--tasks" }, content)
+  );
+}
+
+function createTaskCard(card: TaskCardData): HTMLElement {
+  return h(
+    "article",
+    { class: "para-card para-card--task" },
+    h(
+      "div",
+      { class: "para-card__row" },
+      h("h3", { class: "para-card__title" }, card.title),
+      h(
+        "div",
+        { class: "para-card__badges" },
+        h(
+          "span",
+          { class: `para-tag para-tag--priority-${card.priority.toLowerCase()}` },
+          card.priority.toUpperCase()
+        ),
+        h(
+          "span",
+          { class: `para-tag para-tag--${card.status.toLowerCase()}` },
+          card.status.replace("-", " ").toUpperCase()
+        )
+      )
+    ),
+    h(
+      "div",
+      { class: "para-card__row" },
+      h("p", { class: "para-card__meta" }, `Created: ${card.createdAt}`),
+      card.dueDate && h("p", { class: "para-card__meta para-card__meta--right" }, `Due: ${card.dueDate}`)
+    )
+  );
+}
+
+function createTaskCardSkeleton(): HTMLElement {
+  return h(
+    "article",
+    { class: "para-card para-card--task is-loading" },
+    h(
+      "div",
+      {},
+      h("h3", { class: "para-card__title" })
+    ),
+    h("span", { class: "para-tag" })
+  );
+}
+
 function createArchiveSection(): HTMLElement {
   return h(
     "section",
@@ -593,9 +717,44 @@ function renderSections(state: AppState): HTMLElement {
     "div",
     { class: "para-sections" },
     createProjectsSection(state.projects, state.isLoadingProjects),
+    createTasksSection(state.tasks, state.isLoadingTasks),
     createAreasSection(state.areas, state.isLoadingAreas),
     createResourcesSection(),
     createArchiveSection()
+  );
+}
+
+const notificationStore = {
+  add: (message: string, type: "success" | "error" | "info") => {
+    const id = `notif-${Date.now()}`;
+    const currentNotifications = store.get().notifications;
+    store.update({
+      ...store.get(),
+      notifications: [...currentNotifications, { id, message, type }],
+    });
+    setTimeout(() => {
+      notificationStore.remove(id);
+    }, 5000);
+  },
+  remove: (id: string) => {
+    const currentNotifications = store.get().notifications;
+    store.update({
+      ...store.get(),
+      notifications: currentNotifications.filter((n) => n.id !== id),
+    });
+  },
+};
+
+function renderNotifications(notifications: readonly Notification[]): HTMLElement {
+  return h(
+    "div",
+    { class: "para-toast-container" },
+    ...notifications.map((notification) =>
+      createToast({
+        notification,
+        onClose: () => notificationStore.remove(notification.id),
+      })
+    )
   );
 }
 
@@ -659,13 +818,26 @@ function renderLayout(state: AppState): HTMLElement {
   const handleAuthSuccess = async (): Promise<void> => {
     try {
       const user = await getCurrentUser();
-      const [areas, projects] = await Promise.all([getAreas(), getProjects()]);
+      const [areas, projects, tasks] = await Promise.all([
+        getAreas(),
+        getProjects(),
+        getTasks(),
+      ]);
 
       const areaCards: AreaCardData[] = areas.map((area) => ({
         id: area.id,
         label: area.name,
         summary: area.description,
         icon: area.iconName,
+      }));
+
+      const taskCards: TaskCardData[] = tasks.map((task) => ({
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        priority: task.priority,
+        createdAt: new Date(task.createdAt).toLocaleDateString(),
+        dueDate: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : undefined,
       }));
 
       const projectCards: ProjectCardData[] = projects.map((project) => ({
@@ -683,16 +855,60 @@ function renderLayout(state: AppState): HTMLElement {
         userName: user.displayName,
         areas: areaCards,
         projects: projectCards,
+        tasks: taskCards,
         isLoginModalOpen: false,
         isRegisterModalOpen: false,
         isLoadingAreas: false,
         isLoadingProjects: false,
+        isLoadingTasks: false,
       });
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error("Failed to get user:", error);
     }
   };
+
+  const handleTaskCreated = async (): Promise<void> => {
+    try {
+      store.update({
+        ...store.get(),
+        isTaskModalOpen: false,
+        isLoadingTasks: true,
+      });
+
+      const tasks = await getTasks();
+      const taskCards: TaskCardData[] = tasks.map((task) => ({
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        priority: task.priority,
+        createdAt: new Date(task.createdAt).toLocaleDateString(),
+        dueDate: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : undefined,
+      }));
+
+      store.update({
+        ...store.get(),
+        tasks: taskCards,
+        isLoadingTasks: false,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "An unknown error occurred";
+      notificationStore.add(`Failed to create task: ${message}`, "error");
+      store.update({ ...store.get(), isLoadingTasks: false });
+    }
+  };
+
+  const taskModal = createTaskModal({
+    isOpen: state.isTaskModalOpen,
+    onClose: () => store.update({ ...store.get(), isTaskModalOpen: false }),
+    onTaskCreated: () => {
+      void handleTaskCreated();
+    },
+    onTaskCreateError: (error: string) => {
+      notificationStore.add(`Failed to create task: ${error}`, "error");
+    },
+    areas: state.areas.map((a) => ({ id: a.id, name: a.label })),
+    projects: state.projects.map((p) => ({ id: p.id, title: p.title })),
+  });
 
   const projectModal = createProjectModal({
     isOpen: state.isProjectModalOpen,
@@ -702,6 +918,8 @@ function renderLayout(state: AppState): HTMLElement {
     },
     areas: state.areas.map((a) => ({ id: a.id, name: a.label })),
   });
+
+  const notifications = renderNotifications(state.notifications);
 
   const areaModal = createAreaModal({
     isOpen: state.isModalOpen,
@@ -754,6 +972,9 @@ function renderLayout(state: AppState): HTMLElement {
     }
     if (projectModal) {
       children.push(projectModal);
+    }
+    if (taskModal) {
+      children.push(taskModal);
     }
   } else {
     children.push(
@@ -871,6 +1092,9 @@ function renderLayout(state: AppState): HTMLElement {
   if (registerModal) {
     children.push(registerModal);
   }
+  if (notifications) {
+    children.push(notifications);
+  }
 
   return h("div", { class: "para-app" }, ...children);
 }
@@ -879,13 +1103,26 @@ async function initializeAuth(): Promise<void> {
   if (isAuthenticated()) {
     try {
       const user = await getCurrentUser();
-      const [areas, projects] = await Promise.all([getAreas(), getProjects()]);
+      const [areas, projects, tasks] = await Promise.all([
+        getAreas(),
+        getProjects(),
+        getTasks(),
+      ]);
 
       const areaCards: AreaCardData[] = areas.map((area) => ({
         id: area.id,
         label: area.name,
         summary: area.description,
         icon: area.iconName,
+      }));
+
+      const taskCards: TaskCardData[] = tasks.map((task) => ({
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        priority: task.priority,
+        createdAt: new Date(task.createdAt).toLocaleDateString(),
+        dueDate: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : undefined,
       }));
 
       const projectCards: ProjectCardData[] = projects.map((project) => ({
@@ -903,9 +1140,11 @@ async function initializeAuth(): Promise<void> {
         userName: user.displayName,
         areas: areaCards,
         projects: projectCards,
+        tasks: taskCards,
         isLoginModalOpen: false,
         isLoadingAreas: false,
         isLoadingProjects: false,
+        isLoadingTasks: false,
       });
     } catch (error) {
       console.error("Failed to initialize auth:", error);
@@ -916,9 +1155,11 @@ async function initializeAuth(): Promise<void> {
         userName: "",
         areas: [],
         projects: [],
+        tasks: [],
         isLoginModalOpen: true,
         isLoadingAreas: false,
         isLoadingProjects: false,
+        isLoadingTasks: false,
       });
     }
   } else {
@@ -926,6 +1167,7 @@ async function initializeAuth(): Promise<void> {
       ...store.get(),
       isLoadingAreas: false,
       isLoadingProjects: false,
+      isLoadingTasks: false,
     });
   }
 }
