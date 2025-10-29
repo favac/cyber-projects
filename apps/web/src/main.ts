@@ -1,10 +1,16 @@
 import "./styles/para.css";
 import { clear, h, mount } from "./lib/h.ts";
 import { createPersistentStore } from "./stores/persistent-store.ts";
-import { createAreaModal, type AreaFormData } from "./components/area-modal.ts";
+import { createAreaModal } from "./components/area-modal.ts";
 import { createLoginModal } from "./components/login-modal.ts";
 import { createRegisterModal } from "./components/register-modal.ts";
-import { isAuthenticated, logout, getCurrentUser } from "./lib/api.ts";
+import {
+  isAuthenticated,
+  logout,
+  getCurrentUser,
+  getAreas,
+} from "./lib/api.ts";
+import type { Area } from "@cyber/domain";
 
 interface NavItem {
   readonly id: string;
@@ -19,6 +25,8 @@ interface AppState {
   readonly isRegisterModalOpen: boolean;
   readonly isAuthenticated: boolean;
   readonly userName: string;
+  readonly areas: readonly AreaCardData[];
+  readonly isLoadingAreas: boolean;
 }
 
 interface ProjectCardData {
@@ -102,18 +110,6 @@ const projectStatusClassMap: Record<ProjectStatus, string> = {
   "on-hold": "para-tag para-tag--on-hold",
   completed: "para-tag para-tag--completed",
 };
-
-const areaCards: readonly AreaCardData[] = [
-  { id: "health", label: "Health & Fitness", summary: "12 notes", icon: "fitness_center" },
-  {
-    id: "development",
-    label: "Prof. Development",
-    summary: "34 resources",
-    icon: "school",
-  },
-  { id: "home", label: "Home Management", summary: "5 tasks", icon: "home" },
-  { id: "finance", label: "Finance", summary: "8 docs", icon: "account_balance_wallet" },
-];
 
 const resourceCards: readonly ResourceCardData[] = [
   {
@@ -208,6 +204,8 @@ const store = createPersistentStore<AppState>("para-app", {
   isRegisterModalOpen: false,
   isAuthenticated: isAuthenticated(),
   userName: "",
+  areas: [],
+  isLoadingAreas: true,
 });
 
 function materialIcon(name: string, className?: string): HTMLElement {
@@ -222,7 +220,11 @@ function createNavBrand(): HTMLElement {
   return h(
     "div",
     { class: "para-nav__brand" },
-    h("div", { class: "para-nav__brand-icon" }, materialIcon("design_services")),
+    h(
+      "div",
+      { class: "para-nav__brand-icon" },
+      materialIcon("design_services")
+    ),
     h("h1", { class: "para-nav__brand-title" }, "CREATIVE HQ")
   );
 }
@@ -287,7 +289,11 @@ function renderTopbar(state: AppState): HTMLElement {
             style: { padding: "0 16px", height: "36px", fontSize: "11px" },
             onClick: () => {
               logout();
-              store.update({ ...store.get(), isAuthenticated: false, userName: "" });
+              store.update({
+                ...store.get(),
+                isAuthenticated: false,
+                userName: "",
+              });
             },
           },
           "LOGOUT"
@@ -333,11 +339,7 @@ function renderTopbar(state: AppState): HTMLElement {
         type: "search",
       })
     ),
-    h(
-      "div",
-      { class: "para-topbar__actions" },
-      ...authActions
-    )
+    h("div", { class: "para-topbar__actions" }, ...authActions)
   );
 }
 
@@ -377,6 +379,20 @@ function createProjectsSection(): HTMLElement {
   );
 }
 
+function createAreaCardSkeleton(): HTMLElement {
+  return h(
+    "article",
+    { class: "para-card para-card--area is-loading" },
+    h("div", { class: "para-area-icon" }),
+    h(
+      "div",
+      {},
+      h("h3", { class: "para-card__title" }),
+      h("p", { class: "para-card__meta" })
+    )
+  );
+}
+
 function createAreaCard(card: AreaCardData): HTMLElement {
   return h(
     "article",
@@ -391,7 +407,13 @@ function createAreaCard(card: AreaCardData): HTMLElement {
   );
 }
 
-function createAreasSection(): HTMLElement {
+function createAreasSection(
+  areas: readonly AreaCardData[],
+  isLoading: boolean
+): HTMLElement {
+  const content = isLoading
+    ? Array.from({ length: 5 }, () => createAreaCardSkeleton())
+    : areas.map((card) => createAreaCard(card));
   return h(
     "section",
     { class: "para-section" },
@@ -399,13 +421,30 @@ function createAreasSection(): HTMLElement {
       "div",
       { class: "para-section__header" },
       h("h2", { class: "para-section__title" }, "AREAS OF FOCUS"),
-      h("a", { class: "para-section__link", href: "#" }, "VIEW ALL")
+      h(
+        "div",
+        { style: { display: "flex", alignItems: "center", gap: "16px" } },
+        h(
+          "a",
+          {
+            class: "para-section__link",
+            href: "#",
+            onClick: (e) => {
+              e.preventDefault();
+              store.update({ ...store.get(), isModalOpen: true });
+            },
+          },
+          materialIcon("add"),
+          h("span", { class: "para-section__link-text" }, "NEW AREA")
+        ),
+        h(
+          "a",
+          { class: "para-section__link", href: "#" },
+          h("span", { class: "para-section__link-text" }, "VIEW ALL")
+        )
+      )
     ),
-    h(
-      "div",
-      { class: "para-card-grid para-card-grid--areas" },
-      areaCards.map((card) => createAreaCard(card))
-    )
+    h("div", { class: "para-card-grid para-card-grid--areas" }, content)
   );
 }
 
@@ -413,10 +452,10 @@ function createResourceCard(card: ResourceCardData): HTMLElement {
   return h(
     "article",
     { class: "para-card para-card--resource" },
-    h(
-      "div",
-      { class: "para-card__media", style: { backgroundImage: card.image, aspectRatio: card.aspectRatio } }
-    ),
+    h("div", {
+      class: "para-card__media",
+      style: { backgroundImage: card.image, aspectRatio: card.aspectRatio },
+    }),
     h(
       "button",
       {
@@ -443,7 +482,12 @@ function createResourcesSection(): HTMLElement {
       "div",
       { class: "para-section__header" },
       h("h2", { class: "para-section__title" }, "INSPIRATION & RESOURCES"),
-      h("a", { class: "para-section__link", href: "#" }, materialIcon("add"), "QUICK SAVE")
+      h(
+        "a",
+        { class: "para-section__link", href: "#" },
+        materialIcon("add"),
+        "QUICK SAVE"
+      )
     ),
     h(
       "div",
@@ -457,10 +501,10 @@ function createArchiveCard(card: ArchiveCardData): HTMLElement {
   return h(
     "article",
     { class: "para-card para-card--archive" },
-    h(
-      "div",
-      { class: "para-card__media", style: { backgroundImage: card.image, aspectRatio: card.aspectRatio } }
-    ),
+    h("div", {
+      class: "para-card__media",
+      style: { backgroundImage: card.image, aspectRatio: card.aspectRatio },
+    }),
     h(
       "button",
       {
@@ -487,7 +531,12 @@ function createArchiveSection(): HTMLElement {
       "div",
       { class: "para-section__header" },
       h("h2", { class: "para-section__title" }, "ARCHIVED VISUALS"),
-      h("a", { class: "para-section__link", href: "#" }, materialIcon("search"), "BROWSE ALL")
+      h(
+        "a",
+        { class: "para-section__link", href: "#" },
+        materialIcon("search"),
+        "BROWSE ALL"
+      )
     ),
     h(
       "div",
@@ -497,37 +546,63 @@ function createArchiveSection(): HTMLElement {
   );
 }
 
-function renderSections(): HTMLElement {
+function renderSections(state: AppState): HTMLElement {
   return h(
     "div",
     { class: "para-sections" },
     createProjectsSection(),
-    createAreasSection(),
+    createAreasSection(state.areas, state.isLoadingAreas),
     createResourcesSection(),
     createArchiveSection()
   );
 }
-
 
 function renderLayout(state: AppState): HTMLElement {
   const handleCloseModal = (): void => {
     store.update({ ...store.get(), isModalOpen: false });
   };
 
-  const handleSubmitArea = (data: AreaFormData): void => {
-    // eslint-disable-next-line no-console
-    console.log("Creating area:", data);
+  const handleSubmitArea = async (): Promise<void> => {
+    try {
+      store.update({
+        ...store.get(),
+        isModalOpen: false,
+        isLoadingAreas: true,
+      });
+
+      const areas = await getAreas();
+      const areaCards: AreaCardData[] = areas.map((area: Area) => ({
+        id: area.id,
+        label: area.name,
+        summary: area.description,
+        icon: area.iconName,
+      }));
+
+      store.update({ ...store.get(), areas: areaCards, isLoadingAreas: false });
+    } catch (error) {
+      console.error("Failed to create area:", error);
+      store.update({ ...store.get(), isLoadingAreas: false });
+    }
   };
 
   const handleAuthSuccess = async (): Promise<void> => {
     try {
       const user = await getCurrentUser();
+      const areas = await getAreas();
+      const areaCards: AreaCardData[] = areas.map((area: Area) => ({
+        id: area.id,
+        label: area.name,
+        summary: area.description,
+        icon: area.iconName,
+      }));
       store.update({
         ...store.get(),
         isAuthenticated: true,
         userName: user.displayName,
+        areas: areaCards,
         isLoginModalOpen: false,
         isRegisterModalOpen: false,
+        isLoadingAreas: false,
       });
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -538,7 +613,9 @@ function renderLayout(state: AppState): HTMLElement {
   const areaModal = createAreaModal({
     isOpen: state.isModalOpen,
     onClose: handleCloseModal,
-    onSubmit: handleSubmitArea,
+    onAreaCreated: () => {
+      void handleSubmitArea();
+    },
   });
 
   const loginModal = createLoginModal({
@@ -568,11 +645,16 @@ function renderLayout(state: AppState): HTMLElement {
   });
 
   const children = [];
-  
+
   if (state.isAuthenticated) {
     children.push(
       renderNavigation(state),
-      h("main", { class: "para-main" }, renderTopbar(state), renderSections())
+      h(
+        "main",
+        { class: "para-main" },
+        renderTopbar(state),
+        renderSections(state)
+      )
     );
     if (areaModal) {
       children.push(areaModal);
@@ -686,14 +768,14 @@ function renderLayout(state: AppState): HTMLElement {
       )
     );
   }
-  
+
   if (loginModal) {
     children.push(loginModal);
   }
   if (registerModal) {
     children.push(registerModal);
   }
-  
+
   return h("div", { class: "para-app" }, ...children);
 }
 
@@ -701,23 +783,35 @@ async function initializeAuth(): Promise<void> {
   if (isAuthenticated()) {
     try {
       const user = await getCurrentUser();
+      const areas = await getAreas();
+      const areaCards: AreaCardData[] = areas.map((area: Area) => ({
+        id: area.id,
+        label: area.name,
+        summary: area.description,
+        icon: area.iconName,
+      }));
       store.update({
         ...store.get(),
         isAuthenticated: true,
         userName: user.displayName,
+        areas: areaCards,
         isLoginModalOpen: false,
+        isLoadingAreas: false,
       });
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error("Failed to validate token:", error);
+      console.error("Failed to initialize auth:", error);
       logout();
       store.update({
         ...store.get(),
         isAuthenticated: false,
         userName: "",
+        areas: [],
         isLoginModalOpen: true,
+        isLoadingAreas: false,
       });
     }
+  } else {
+    store.update({ ...store.get(), isLoadingAreas: false });
   }
 }
 

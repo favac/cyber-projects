@@ -1,3 +1,5 @@
+import type { Area } from "@cyber/domain";
+import { createArea } from "../lib/api.ts";
 import { h } from "../lib/h.ts";
 
 export interface AreaFormData {
@@ -10,7 +12,7 @@ export interface AreaFormData {
 interface AreaModalProps {
   readonly isOpen: boolean;
   readonly onClose: () => void;
-  readonly onSubmit: (data: AreaFormData) => void;
+  readonly onAreaCreated: (newArea: Area) => void;
 }
 
 function materialIcon(name: string, className?: string): HTMLElement {
@@ -41,7 +43,12 @@ export function createAreaModal(props: AreaModalProps): HTMLElement | null {
 
   const handleSubmit = (event: Event): void => {
     event.preventDefault();
-    props.onSubmit(formData);
+    createArea(formData)
+      .then(props.onAreaCreated)
+      .catch((err) => {
+        console.error("Failed to create area:", err);
+        // Here you could show an error message to the user
+      });
     handleClose();
   };
 
